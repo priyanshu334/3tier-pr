@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+
+    container_name: postgres-db
+
+    restart: always
+
+    env_file:
+      - .env
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backend/src/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+
+    container_name: backend
+
+    depends_on:
+      - postgres
+
+    env_file:
+      - ./backend/.env
+
+    ports:
+      - "5000:5000"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres-data:
